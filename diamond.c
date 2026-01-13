@@ -93,14 +93,14 @@ void render() {
         for (int32_t i = 0; i < self.diamondHeight; i++) {
             double circleX = diamondXLeft + 240 * diamondAspect / self.diamondWidth / 2;
             for (int32_t j = 0; j < self.diamondHeight; j++) {
-                printf("%d %d %d\n", self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2]);
-                turtleCircleColor(circleX, circleY, 120.0 / self.diamondHeight, self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2], 255);
+                // printf("%d %d %d\n", self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2]);
+                turtleCircleColor(circleX, circleY, 120.0 / self.diamondHeight, self.diamondData[i * self.diamondWidth * 3 + j * 3] / 255.0, self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1] / 255.0, self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2] / 255.0, 1.0);
                 circleX += 240 * diamondAspect / self.diamondWidth;
             }
             circleY -= 240.0 / self.diamondHeight;
         }
     }
-    turtleCircleColor(0, 0, 40, 1.0, 255, 0, 255);
+    // turtleCircleColor(0, 0, 40, 1.0, 255, 0, 255);
     /* render original image (preview) */
     if (self.originalTexture != -1) {
         double originalAspect = (double) self.originalWidth / self.originalHeight;
