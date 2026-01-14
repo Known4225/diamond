@@ -3,6 +3,21 @@
 #include "turtle.h"
 #include <time.h>
 
+int32_t import(char *filename);
+
+typedef enum {
+    RESIZE_MODE_LINEAR = 0,
+    RESIZE_MODE_SRGB = 1,
+    RESIZE_MODE_NEAREST_NEIGHBOR = 2,
+} resize_mode_t;
+
+typedef enum {
+    DIAMOND_KEY_LMB = 0,
+    DIAMOND_KEY_RMB = 0,
+    DIAMOND_KEY_LEFT_ARROW = 2,
+    DIAMOND_KEY_RIGHT_ARROW = 3,
+} diamond_key_t;
+
 typedef struct {
     /* original file */
     char originalFilename[4096];
@@ -11,6 +26,9 @@ typedef struct {
     int32_t originalChannels;
     uint8_t *originalData;
     turtle_texture_t originalTexture;
+    /* transform */
+    int32_t resizeMode;
+    tt_dropdown_t *resizeModeDropdown;
     /* diamond file */
     uint8_t *diamondFilename[4096];
     int32_t diamondWidth;
@@ -20,6 +38,7 @@ typedef struct {
     turtle_texture_t diamondTexture;
     /* UI */
     tt_slider_t *resolutionSlider;
+    int8_t keys[10];
 } diamond_t;
 
 diamond_t self;
@@ -29,14 +48,24 @@ void init() {
     self.originalFilename[0] = '\0';
     self.originalData = NULL;
     self.originalTexture = -1;
+    /* transform */
+    self.resizeMode = RESIZE_MODE_LINEAR;
+    list_t *resizeModeOptions = list_init();
+    list_append(resizeModeOptions, (unitype) "Linear", 's');
+    list_append(resizeModeOptions, (unitype) "SRGB", 's');
+    list_append(resizeModeOptions, (unitype) "Nearest Neighbor", 's');
+    self.resizeModeDropdown = dropdownInit("Resize Mode", resizeModeOptions, &self.resizeMode, TT_DROPDOWN_ALIGN_RIGHT, 308, 0, 8);
     /* diamond file */
     self.diamondData = NULL;
     self.diamondTexture = -1;
     /* UI */
-    self.resolutionSlider = sliderInit("Resolution", NULL, TT_SLIDER_TYPE_HORIZONTAL, TT_SLIDER_ALIGN_LEFT, 250, 0, 8, 60, 1, 500, 1);
+    self.resolutionSlider = sliderInit("Resolution", NULL, TT_SLIDER_TYPE_HORIZONTAL, TT_SLIDER_ALIGN_CENTER, 220, 60, 8, 60, 1, 200, 1);
     self.resolutionSlider -> scale = TT_SLIDER_SCALE_EXP;
-    self.resolutionSlider -> defaultValue = 60;
-    self.resolutionSlider -> value = 60;
+    self.resolutionSlider -> defaultValue = 30;
+    self.resolutionSlider -> value = 30;
+
+    /* default file */
+    import("images/thumbnail.png");
 }
 
 /* import image */
@@ -58,6 +87,26 @@ int32_t import(char *filename) {
     return 0;
 }
 
+unsigned char *resize_nearest_neighbor( const unsigned char *input_pixels, int input_w, int input_h, int input_stride_in_bytes, unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes, stbir_pixel_layout pixel_type) {
+    int32_t channels = input_stride_in_bytes / input_w;
+    uint8_t *output = malloc(output_w * output_h * channels);
+    if (output == NULL) {
+        return NULL;
+    }
+    double xScale = (double) input_w / output_w;
+    double yScale = (double) input_h / output_h;
+    for (int32_t i = 0; i < output_h; i++) {
+        for (int32_t j = 0; j < output_w; j++) {
+            for (int32_t k = 0; k < channels; k++) {
+                int32_t scratchIndex = (((int32_t) (i * yScale)) * input_w + ((int32_t) (j * xScale))) * channels + k;
+                // printf("image[%d] = scratch[%d] = %d\n", i * desiredWidth * channels + j * channels + k, scratchIndex, scratch[scratchIndex]);
+                output[(i * output_w + j) * channels + k] = input_pixels[scratchIndex]; // nearest neighbor (top left neighbor)
+            }
+        }
+    }
+    return output;
+}
+
 void transform() {
     if (self.diamondTexture != -1) {
         turtleTextureUnload(self.diamondTexture);
@@ -72,10 +121,24 @@ void transform() {
     if (self.diamondData != NULL) {
         free(self.diamondData);
     }
-    self.diamondData = stbir_resize_uint8_linear(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth, STBIR_RGB);
-    if (self.diamondData == NULL) {
-        printf("resized failed\n");
-        return;
+    if (self.resizeMode == RESIZE_MODE_LINEAR) {
+        self.diamondData = stbir_resize_uint8_linear(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth, STBIR_RGB);
+        if (self.diamondData == NULL) {
+            printf("resized linear failed\n");
+            return;
+        }
+    } else if (self.resizeMode == RESIZE_MODE_SRGB) {
+        self.diamondData = stbir_resize_uint8_srgb(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth, STBIR_RGB);
+        if (self.diamondData == NULL) {
+            printf("resized srgb failed\n");
+            return;
+        }
+    } else if (self.resizeMode == RESIZE_MODE_NEAREST_NEIGHBOR) {
+        self.diamondData = resize_nearest_neighbor(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth, STBIR_RGB);
+        if (self.diamondData == NULL) {
+            printf("resized nearest neighbor failed\n");
+            return;
+        }
     }
     self.diamondTexture = turtleTextureLoadArray(self.diamondData, self.diamondWidth, self.diamondHeight, GL_RGB);
 }
@@ -84,34 +147,87 @@ void render() {
     /* render transformed image */
     if (self.diamondTexture != -1) {
         double diamondAspect = (double) self.diamondWidth / self.diamondHeight;
-        double diamondXLeft = 0 - 120 * diamondAspect;
-        double diamondXRight = 0 + 120 * diamondAspect;
+        double diamondXLeft = -50 - 120 * diamondAspect;
+        double diamondXRight = -50 + 120 * diamondAspect;
         double diamondY = -120;
         // turtleTexture(self.diamondTexture, diamondXLeft, diamondY, diamondXRight, diamondY + 240, 0, 255, 255, 255);
         /* render diamond art */
         double circleY = diamondY + 240 - 240.0 / self.diamondHeight / 2;
         for (int32_t i = 0; i < self.diamondHeight; i++) {
             double circleX = diamondXLeft + 240 * diamondAspect / self.diamondWidth / 2;
-            for (int32_t j = 0; j < self.diamondHeight; j++) {
+            for (int32_t j = 0; j < self.diamondWidth; j++) {
                 // printf("%d %d %d\n", self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2]);
                 turtleCircleColor(circleX, circleY, 120.0 / self.diamondHeight, self.diamondData[i * self.diamondWidth * 3 + j * 3] / 255.0, self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1] / 255.0, self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2] / 255.0, 1.0);
                 circleX += 240 * diamondAspect / self.diamondWidth;
             }
             circleY -= 240.0 / self.diamondHeight;
         }
+        /* render dot dimensions */
+        tt_setColor(TT_COLOR_TEXT);
+        turtlePenSize(2);
+        turtleGoto(diamondXLeft - 10, diamondY );
     }
-    // turtleCircleColor(0, 0, 40, 1.0, 255, 0, 255);
     /* render original image (preview) */
     if (self.originalTexture != -1) {
         double originalAspect = (double) self.originalWidth / self.originalHeight;
-        double previewX = -312;
-        double previewY = 110;
-        turtleTexture(self.originalTexture, previewX, previewY, previewX + 50 * originalAspect, previewY + 50, 0, 255, 255, 255);
+        double previewX = 305;
+        double previewY = 90;
+        turtleTexture(self.originalTexture, previewX, previewY, previewX - 50 * originalAspect, previewY + 50, 0, 255, 255, 255);
+        tt_setColor(TT_COLOR_TEXT);
+        turtleTextWriteString("Preview", (previewX + previewX - 50 * originalAspect) / 2, previewY + 50 + 15, 10, 50);
+        self.resolutionSlider -> x = (previewX + previewX - 50 * originalAspect) / 2;
     }
 }
 
 void mouseTick() {
-
+    if (turtleKeyPressed(GLFW_KEY_LEFT)) {
+        if (self.keys[DIAMOND_KEY_LEFT_ARROW] < 2) {
+            if (self.keys[DIAMOND_KEY_LEFT_ARROW] == 0) {
+                self.keys[DIAMOND_KEY_LEFT_ARROW] = 10;
+            } else {
+                self.keys[DIAMOND_KEY_LEFT_ARROW] = 2;
+            }
+            if (self.resolutionSlider -> value > self.resolutionSlider -> range[0]) {
+                self.resolutionSlider -> value--;
+            }
+        } else if (self.keys[DIAMOND_KEY_LEFT_ARROW] >= 10) {
+            self.keys[DIAMOND_KEY_LEFT_ARROW]++;
+            if (self.keys[DIAMOND_KEY_LEFT_ARROW] > 40) {
+                self.keys[DIAMOND_KEY_LEFT_ARROW] = 1;
+            }
+        } else {
+            self.keys[DIAMOND_KEY_LEFT_ARROW]++;
+            if (self.keys[DIAMOND_KEY_LEFT_ARROW] > 3) {
+                self.keys[DIAMOND_KEY_LEFT_ARROW] = 1;
+            }
+        }
+    } else {
+        self.keys[DIAMOND_KEY_LEFT_ARROW] = 0;
+    }
+    if (turtleKeyPressed(GLFW_KEY_RIGHT)) {
+        if (self.keys[DIAMOND_KEY_RIGHT_ARROW] < 2) {
+            if (self.keys[DIAMOND_KEY_RIGHT_ARROW] == 0) {
+                self.keys[DIAMOND_KEY_RIGHT_ARROW] = 10;
+            } else {
+                self.keys[DIAMOND_KEY_RIGHT_ARROW] = 2;
+            }
+            if (self.resolutionSlider -> value < self.resolutionSlider -> range[1]) {
+                self.resolutionSlider -> value++;
+            }
+        } else if (self.keys[DIAMOND_KEY_RIGHT_ARROW] >= 10) {
+            self.keys[DIAMOND_KEY_RIGHT_ARROW]++;
+            if (self.keys[DIAMOND_KEY_RIGHT_ARROW] > 40) {
+                self.keys[DIAMOND_KEY_RIGHT_ARROW] = 1;
+            }
+        } else {
+            self.keys[DIAMOND_KEY_RIGHT_ARROW]++;
+            if (self.keys[DIAMOND_KEY_RIGHT_ARROW] > 3) {
+                self.keys[DIAMOND_KEY_RIGHT_ARROW] = 1;
+            }
+        }
+    } else {
+        self.keys[DIAMOND_KEY_RIGHT_ARROW] = 0;
+    }
 }
 
 void parseRibbonOutput() {
