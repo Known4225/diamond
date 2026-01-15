@@ -115,8 +115,8 @@ void transform() {
     if (self.originalData == NULL) {
         return;
     }
-    self.diamondWidth = self.originalWidth * self.resolutionSlider -> value / 500;
-    self.diamondHeight = self.originalHeight * self.resolutionSlider -> value / 500;
+    self.diamondWidth = (double) self.originalWidth / self.originalHeight * self.resolutionSlider -> value;
+    self.diamondHeight = self.resolutionSlider -> value;
     self.diamondChannels = 3;
     if (self.diamondData != NULL) {
         free(self.diamondData);
@@ -165,14 +165,32 @@ void render() {
         /* render dot dimensions */
         tt_setColor(TT_COLOR_TEXT);
         turtlePenSize(2);
-        turtleGoto(diamondXLeft - 10, diamondY );
+        turtleGoto(diamondXLeft - 25, diamondY);
+        turtlePenDown();
+        turtleGoto(diamondXLeft - 15, diamondY);
+        turtleGoto(diamondXLeft - 20, diamondY);
+        turtleGoto(diamondXLeft - 20, diamondY + 240);
+        turtleGoto(diamondXLeft - 25, diamondY + 240);
+        turtleGoto(diamondXLeft - 15, diamondY + 240);
+        turtlePenUp();
+        turtleTextWriteStringf(diamondXLeft - 30, (diamondY * 2 + 240) / 2, 15, 100, "%d", self.diamondHeight);
+
+        turtleGoto(diamondXLeft, diamondY - 25);
+        turtlePenDown();
+        turtleGoto(diamondXLeft, diamondY - 15);
+        turtleGoto(diamondXLeft, diamondY - 20);
+        turtleGoto(diamondXRight, diamondY - 20);
+        turtleGoto(diamondXRight, diamondY - 25);
+        turtleGoto(diamondXRight, diamondY - 15);
+        turtlePenUp();
+        turtleTextWriteStringf((diamondXRight + diamondXLeft) / 2, diamondY - 35, 15, 50, "%d", self.diamondWidth);
     }
     /* render original image (preview) */
     if (self.originalTexture != -1) {
         double originalAspect = (double) self.originalWidth / self.originalHeight;
         double previewX = 305;
         double previewY = 90;
-        turtleTexture(self.originalTexture, previewX, previewY, previewX - 50 * originalAspect, previewY + 50, 0, 255, 255, 255);
+        turtleTexture(self.originalTexture, previewX - 50 * originalAspect, previewY, previewX, previewY + 50, 0, 255, 255, 255);
         tt_setColor(TT_COLOR_TEXT);
         turtleTextWriteString("Preview", (previewX + previewX - 50 * originalAspect) / 2, previewY + 50 + 15, 10, 50);
         self.resolutionSlider -> x = (previewX + previewX - 50 * originalAspect) / 2;
