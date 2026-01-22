@@ -1,3 +1,7 @@
+/* TODO
+- Make table of all colors and allow user to edit, merge, and assign letters to them
+*/
+
 // #define TURTLE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include "turtle.h"
