@@ -18,6 +18,11 @@ typedef enum {
     DIAMOND_KEY_RIGHT_ARROW = 3,
 } diamond_key_t;
 
+typedef enum {
+    DIAMOND_UI_MODE_IMAGE = 0,
+    DIAMOND_UI_MODE_COLOR = 1,
+} diamond_ui_mode_t;
+
 typedef struct {
     /* original file */
     char originalFilename[4096];
@@ -38,6 +43,9 @@ typedef struct {
     turtle_texture_t diamondTexture;
     /* UI */
     tt_slider_t *resolutionSlider;
+    tt_button_t *imageButton;
+    tt_button_t *colorButton;
+    diamond_ui_mode_t mode;
     int8_t keys[10];
 } diamond_t;
 
@@ -54,15 +62,24 @@ void init() {
     list_append(resizeModeOptions, (unitype) "Linear", 's');
     list_append(resizeModeOptions, (unitype) "SRGB", 's');
     list_append(resizeModeOptions, (unitype) "Nearest Neighbor", 's');
-    self.resizeModeDropdown = dropdownInit("Resize Mode", resizeModeOptions, &self.resizeMode, TT_DROPDOWN_ALIGN_RIGHT, 308, 0, 8);
+    self.resizeModeDropdown = dropdownInit("Resize Mode", resizeModeOptions, &self.resizeMode, TT_DROPDOWN_ALIGN_CENTER, 220, 20, 8);
+    self.resizeModeDropdown -> color[TT_COLOR_SLOT_DROPDOWN_TEXT] = TT_COLOR_COMPONENT_ALTERNATE;
     /* diamond file */
     self.diamondData = NULL;
     self.diamondTexture = -1;
     /* UI */
+    self.mode = DIAMOND_UI_MODE_IMAGE;
     self.resolutionSlider = sliderInit("Resolution", NULL, TT_SLIDER_TYPE_HORIZONTAL, TT_SLIDER_ALIGN_CENTER, 220, 60, 8, 60, 1, 200, 1);
+    self.resolutionSlider -> color[TT_COLOR_SLOT_SLIDER_TEXT] = TT_COLOR_COMPONENT_ALTERNATE;
     self.resolutionSlider -> scale = TT_SLIDER_SCALE_EXP;
-    self.resolutionSlider -> defaultValue = 30;
-    self.resolutionSlider -> value = 30;
+    self.resolutionSlider -> defaultValue = 45;
+    self.resolutionSlider -> value = 45;
+    self.imageButton = buttonInit("Image", NULL, 320, -172, 10);
+    self.imageButton -> align = TT_BUTTON_ALIGN_RIGHT;
+    self.imageButton -> color[TT_COLOR_SLOT_BUTTON_CLICKED] = TT_COLOR_BACKGROUND_COMPLEMENT;
+    self.colorButton = buttonInit("Color", NULL, 280, -172, 10);
+    self.colorButton -> align = TT_BUTTON_ALIGN_RIGHT;
+    self.colorButton -> color[TT_COLOR_SLOT_BUTTON_CLICKED] = TT_COLOR_BACKGROUND_COMPLEMENT;
 
     /* default file */
     import("images/thumbnail.png");
@@ -185,15 +202,43 @@ void render() {
         turtlePenUp();
         turtleTextWriteStringf((diamondXRight + diamondXLeft) / 2, diamondY - 35, 15, 50, "%d", self.diamondWidth);
     }
+    /* sidebar */
+    tt_setColor(TT_COLOR_BACKGROUND_COMPLEMENT);
+    turtleRectangle(238, 180, 320, -180);
+    if (self.mode == DIAMOND_UI_MODE_IMAGE) {
+        self.imageButton -> color[TT_COLOR_SLOT_BUTTON] = TT_COLOR_BACKGROUND_COMPLEMENT;
+        self.imageButton -> color[TT_COLOR_SLOT_BUTTON_SELECT] = TT_COLOR_BACKGROUND_COMPLEMENT;
+        self.imageButton -> color[TT_COLOR_SLOT_BUTTON_TEXT] = TT_COLOR_COMPONENT_ALTERNATE;
+        self.colorButton -> color[TT_COLOR_SLOT_BUTTON] = TT_COLOR_COMPONENT;
+        self.colorButton -> color[TT_COLOR_SLOT_BUTTON_SELECT] = TT_COLOR_COMPONENT_HIGHLIGHT;
+        self.colorButton -> color[TT_COLOR_SLOT_BUTTON_TEXT] = TT_COLOR_TEXT_ALTERNATE;
+        if (self.colorButton -> value) {
+            self.colorButton -> value = 0;
+            self.mode = DIAMOND_UI_MODE_COLOR;
+        }
+    } else if (self.mode == DIAMOND_UI_MODE_COLOR) {
+        self.imageButton -> color[TT_COLOR_SLOT_BUTTON] = TT_COLOR_COMPONENT;
+        self.imageButton -> color[TT_COLOR_SLOT_BUTTON_SELECT] = TT_COLOR_COMPONENT_HIGHLIGHT;
+        self.imageButton -> color[TT_COLOR_SLOT_BUTTON_TEXT] = TT_COLOR_TEXT_ALTERNATE;
+        if (self.imageButton -> value) {
+            self.imageButton -> value = 0;
+            self.mode = DIAMOND_UI_MODE_IMAGE;
+        }
+        self.colorButton -> color[TT_COLOR_SLOT_BUTTON] = TT_COLOR_BACKGROUND_COMPLEMENT;
+        self.colorButton -> color[TT_COLOR_SLOT_BUTTON_SELECT] = TT_COLOR_BACKGROUND_COMPLEMENT;
+        self.colorButton -> color[TT_COLOR_SLOT_BUTTON_TEXT] = TT_COLOR_COMPONENT_ALTERNATE;
+    }
     /* render original image (preview) */
     if (self.originalTexture != -1) {
         double originalAspect = (double) self.originalWidth / self.originalHeight;
         double previewX = 305;
         double previewY = 90;
+        turtleRectangle(previewX - 50 * originalAspect - 15, 180, 320, -180);
         turtleTexture(self.originalTexture, previewX - 50 * originalAspect, previewY, previewX, previewY + 50, 0, 255, 255, 255);
-        tt_setColor(TT_COLOR_TEXT);
+        tt_setColor(TT_COLOR_COMPONENT_ALTERNATE);
         turtleTextWriteString("Preview", (previewX + previewX - 50 * originalAspect) / 2, previewY + 50 + 15, 10, 50);
         self.resolutionSlider -> x = (previewX + previewX - 50 * originalAspect) / 2;
+        self.resizeModeDropdown -> x = (previewX + previewX - 50 * originalAspect) / 2;
     }
 }
 

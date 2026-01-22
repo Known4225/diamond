@@ -2,6 +2,8 @@
 
 Standard sheet is 62x45
 
+Standard wheel has rings of ???
+
 # Turtle Libraries
 
 The turtle libraries are a set of openGL libraries written in C that add functionality similar to the [python turtle graphics library](https://docs.python.org/3/library/turtle.html). These libraries also include other functionality including the ability to write text, interact with the file system, and basic UI elements.
