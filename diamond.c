@@ -3,7 +3,6 @@
 */
 
 // #define TURTLE_IMPLEMENTATION
-#include "stb_image_write.h"
 #include "turtle.h"
 #include <time.h>
 
@@ -66,22 +65,22 @@ void init() {
     list_append(resizeModeOptions, (unitype) "Linear", 's');
     list_append(resizeModeOptions, (unitype) "SRGB", 's');
     list_append(resizeModeOptions, (unitype) "Nearest Neighbor", 's');
-    self.resizeModeDropdown = dropdownInit("Resize Mode", resizeModeOptions, &self.resizeMode, TT_DROPDOWN_ALIGN_CENTER, 220, 20, 8);
+    self.resizeModeDropdown = tt_dropdownInit("Resize Mode", resizeModeOptions, &self.resizeMode, TT_DROPDOWN_ALIGN_CENTER, 220, 20, 8);
     self.resizeModeDropdown -> color[TT_COLOR_SLOT_DROPDOWN_TEXT] = TT_COLOR_COMPONENT_ALTERNATE;
     /* diamond file */
     self.diamondData = NULL;
     self.diamondTexture = -1;
     /* UI */
     self.mode = DIAMOND_UI_MODE_IMAGE;
-    self.resolutionSlider = sliderInit("Resolution", NULL, TT_SLIDER_TYPE_HORIZONTAL, TT_SLIDER_ALIGN_CENTER, 220, 60, 8, 60, 1, 200, 1);
+    self.resolutionSlider = tt_sliderInit("Resolution", NULL, TT_SLIDER_TYPE_HORIZONTAL, TT_SLIDER_ALIGN_CENTER, 220, 60, 8, 60, 1, 200, 1);
     self.resolutionSlider -> color[TT_COLOR_SLOT_SLIDER_TEXT] = TT_COLOR_COMPONENT_ALTERNATE;
     self.resolutionSlider -> scale = TT_SLIDER_SCALE_EXP;
     self.resolutionSlider -> defaultValue = 45;
     self.resolutionSlider -> value = 45;
-    self.imageButton = buttonInit("Image", NULL, 320, -172, 10);
+    self.imageButton = tt_buttonInit("Image", NULL, 320, -172, 10);
     self.imageButton -> align = TT_BUTTON_ALIGN_RIGHT;
     self.imageButton -> color[TT_COLOR_SLOT_BUTTON_CLICKED] = TT_COLOR_BACKGROUND_COMPLEMENT;
-    self.colorButton = buttonInit("Color", NULL, 280, -172, 10);
+    self.colorButton = tt_buttonInit("Color", NULL, 280, -172, 10);
     self.colorButton -> align = TT_BUTTON_ALIGN_RIGHT;
     self.colorButton -> color[TT_COLOR_SLOT_BUTTON_CLICKED] = TT_COLOR_BACKGROUND_COMPLEMENT;
 
@@ -108,31 +107,27 @@ int32_t import(char *filename) {
     return 0;
 }
 
-unsigned char *resize_nearest_neighbor( const unsigned char *input_pixels, int input_w, int input_h, int input_stride_in_bytes, unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes, stbir_pixel_layout pixel_type) {
-    int32_t channels = input_stride_in_bytes / input_w;
-    uint8_t *output = malloc(output_w * output_h * channels);
-    if (output == NULL) {
-        return NULL;
-    }
-    double xScale = (double) input_w / output_w;
-    double yScale = (double) input_h / output_h;
-    for (int32_t i = 0; i < output_h; i++) {
-        for (int32_t j = 0; j < output_w; j++) {
-            for (int32_t k = 0; k < channels; k++) {
-                int32_t scratchIndex = (((int32_t) (i * yScale)) * input_w + ((int32_t) (j * xScale))) * channels + k;
-                // printf("image[%d] = scratch[%d] = %d\n", i * desiredWidth * channels + j * channels + k, scratchIndex, scratch[scratchIndex]);
-                output[(i * output_w + j) * channels + k] = input_pixels[scratchIndex]; // nearest neighbor (top left neighbor)
-            }
-        }
-    }
-    return output;
-}
+// unsigned char *resize_nearest_neighbor(const unsigned char *input_pixels, int input_w, int input_h, int input_stride_in_bytes, unsigned char *output_pixels, int output_w, int output_h, int output_stride_in_bytes) {
+//     int32_t channels = input_stride_in_bytes / input_w;
+//     uint8_t *output = malloc(output_w * output_h * channels);
+//     if (output == NULL) {
+//         return NULL;
+//     }
+//     double xScale = (double) input_w / output_w;
+//     double yScale = (double) input_h / output_h;
+//     for (int32_t i = 0; i < output_h; i++) {
+//         for (int32_t j = 0; j < output_w; j++) {
+//             for (int32_t k = 0; k < channels; k++) {
+//                 int32_t scratchIndex = (((int32_t) (i * yScale)) * input_w + ((int32_t) (j * xScale))) * channels + k;
+//                 // printf("image[%d] = scratch[%d] = %d\n", i * desiredWidth * channels + j * channels + k, scratchIndex, scratch[scratchIndex]);
+//                 output[(i * output_w + j) * channels + k] = input_pixels[scratchIndex]; // nearest neighbor (top left neighbor)
+//             }
+//         }
+//     }
+//     return output;
+// }
 
 void transform() {
-    if (self.diamondTexture != -1) {
-        turtleTextureUnload(self.diamondTexture);
-    }
-    self.diamondTexture = -1;
     if (self.originalData == NULL) {
         return;
     }
@@ -143,25 +138,30 @@ void transform() {
         free(self.diamondData);
     }
     if (self.resizeMode == RESIZE_MODE_LINEAR) {
-        self.diamondData = stbir_resize_uint8_linear(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth, STBIR_RGB);
+        self.diamondData = turtleImageResize(NULL, self.diamondWidth, self.diamondHeight, GL_RGB, self.originalData, self.originalWidth, self.originalHeight, GL_RGB, TURTLE_IMAGE_RESIZE_LINEAR);
         if (self.diamondData == NULL) {
             printf("resized linear failed\n");
             return;
         }
     } else if (self.resizeMode == RESIZE_MODE_SRGB) {
-        self.diamondData = stbir_resize_uint8_srgb(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth, STBIR_RGB);
+        self.diamondData = turtleImageResize(NULL, self.diamondWidth, self.diamondHeight, GL_RGB, self.originalData, self.originalWidth, self.originalHeight, GL_RGB, TURTLE_IMAGE_RESIZE_SRGB);
         if (self.diamondData == NULL) {
             printf("resized srgb failed\n");
             return;
         }
     } else if (self.resizeMode == RESIZE_MODE_NEAREST_NEIGHBOR) {
-        self.diamondData = resize_nearest_neighbor(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth, STBIR_RGB);
+        self.diamondData = turtleImageResize(NULL, self.diamondWidth, self.diamondHeight, GL_RGB, self.originalData, self.originalWidth, self.originalHeight, GL_RGB, TURTLE_IMAGE_RESIZE_NEAREST);
+        // self.diamondData = resize_nearest_neighbor(self.originalData, self.originalWidth, self.originalHeight, self.originalChannels * self.originalWidth, NULL, self.diamondWidth, self.diamondHeight, self.diamondChannels * self.diamondWidth);
         if (self.diamondData == NULL) {
             printf("resized nearest neighbor failed\n");
             return;
         }
     }
-    self.diamondTexture = turtleTextureLoadArray(self.diamondData, self.diamondWidth, self.diamondHeight, GL_RGB);
+    if (self.diamondTexture == -1) {
+        self.diamondTexture = turtleTextureLoadArray(self.diamondData, self.diamondWidth, self.diamondHeight, GL_RGB);
+    } else {
+        turtleTextureReplaceArray(self.diamondTexture, self.diamondData, self.diamondWidth, self.diamondHeight, GL_RGB);
+    }
 }
 
 void renderDotImage(double x, double y, double height, int8_t renderDimensions, int8_t circle) {
@@ -179,7 +179,8 @@ void renderDotImage(double x, double y, double height, int8_t renderDimensions, 
             for (int32_t j = 0; j < self.diamondWidth; j++) {
                 if (circle) {
                     /* render circles */
-                    turtleCircleColor(circleX, circleY, radius, self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2], 255);
+                    // printf("test %d %d %d\n", self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2]);
+                    turtleCircleColor(circleX, circleY, radius, self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2], 0);
                 } else {
                     /* render squares */
                     turtleRectangleColor(circleX - radius, circleY - radius, circleX + radius, circleY + radius, self.diamondData[i * self.diamondWidth * 3 + j * 3], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 1], self.diamondData[i * self.diamondWidth * 3 + j * 3 + 2], 255);
@@ -379,16 +380,16 @@ void parseRibbonOutput() {
         if (tt_ribbon.output[2] == 1) { // Change theme
             printf("Change theme\n");
             if (tt_theme == TT_THEME_DARK) {
-                turtleBgColor(36, 30, 32);
+                turtleBackgroundColor(36, 30, 32);
                 turtleToolsSetTheme(TT_THEME_COLT);
             } else if (tt_theme == TT_THEME_COLT) {
-                turtleBgColor(212, 201, 190);
+                turtleBackgroundColor(212, 201, 190);
                 turtleToolsSetTheme(TT_THEME_NAVY);
             } else if (tt_theme == TT_THEME_NAVY) {
-                turtleBgColor(255, 255, 255);
+                turtleBackgroundColor(255, 255, 255);
                 turtleToolsSetTheme(TT_THEME_LIGHT);
             } else if (tt_theme == TT_THEME_LIGHT) {
-                turtleBgColor(30, 30, 30);
+                turtleBackgroundColor(30, 30, 30);
                 turtleToolsSetTheme(TT_THEME_DARK);
             }
         } 
@@ -475,7 +476,7 @@ int main(int argc, char *argv[]) {
     turtleToolsSetTheme(TT_THEME_DARK); // dark theme preset
     strcpy(constructedFilepath, osToolsFileDialog.executableFilepath);
     strcat(constructedFilepath, "config/ribbonConfig.txt");
-    ribbonInit(constructedFilepath);
+    tt_ribbonInit(constructedFilepath);
     // list_t *ribbonConfig = list_init();
     // list_append(ribbonConfig, (unitype) "File, New, Save, Save As..., Open", 's');
     // list_append(ribbonConfig, (unitype) "Edit, Undo, Redo, Cut, Copy, Paste", 's');
@@ -498,7 +499,7 @@ int main(int argc, char *argv[]) {
     clock_t start, end;
     while (turtle.close == 0) {
         start = clock();
-        turtleGetMouseCoords();
+        turtleGetMouseCoordinates();
         turtleClear();
         transform();
         render();
